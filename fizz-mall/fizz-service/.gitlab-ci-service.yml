@@ -1,0 +1,53 @@
+.service-job-config:
+  image: maven:3-jdk-8-alpine
+  before_script:
+    - cd fizz-service
+  cache:
+    key:
+      files:
+        - fizz-service/pom.xml
+      prefix: service
+    paths:
+      - fizz-service/.m2
+  rules:
+    - changes:
+        - fizz-service/**/*
+
+service-install:
+  stage: install
+  extends: [.service-job-config]
+  script:
+    - mvn install
+
+service-test:
+  stage: test
+  extends: [.service-job-config]
+  script:
+    - mvn test
+
+service-package:
+  stage: package
+  extends: [.service-job-config]
+  script:
+    - cp -rf ${CI_PROJECT_DIR}/fizz-ui/build/*  ${CI_PROJECT_DIR}/fizz-service/src/main/resources/static
+    - mvn clean package -Dmaven.test.skip=true
+  artifacts:
+    paths:
+      - fizz-service/target/*.jar
+
+docker-build:
+  stage: deploy
+  extends: [.service-job-config]
+  cache: []
+  dependencies:
+    - service-package
+  variables:
+    IMAGE_NAME: "spring-react"
+    APP_CONTAINER_NAME: "spring-react-app"
+  image: docker
+  script:
+    - docker build --build-arg JAR_FILE=target/fizz-service.jar -t $IMAGE_NAME .
+    - if [ $(docker ps -aq --filter name=$APP_CONTAINER_NAME) ]; then docker rm -f $APP_CONTAINER_NAME;fi
+    - docker run -d -p 8080:8080 --name $APP_CONTAINER_NAME $IMAGE_NAME
+  environment: prod
+  resource_group: prod

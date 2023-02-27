@@ -1,0 +1,29 @@
+stages:
+  - build
+  - deploy
+
+default:
+  tags:
+    - docker-runner
+
+variables:
+  IMAGE_NAME: "topfe/flaskapp:${CI_COMMIT_SHORT_SHA}"
+
+build_job:
+  stage: build
+  image: docker
+  script:
+    - docker build -t ${IMAGE_NAME} .
+    - docker login -u ${DOCKERHUB_USERNAME} -p ${DOCKERHUB_PWD}
+    - docker push $IMAGE_NAME
+
+deploy_job:
+  stage: deploy
+  image:
+    name: bitnami/kubectl:latest
+    entrypoint: [""]
+  script:
+    - echo "deploy to k8s cluster..."
+    - sed -i "s@FLASK_APP_IMAGE@${IMAGE_NAME}@g" deploy.yaml
+    - kubectl apply -f deploy.yaml
+    - kubectl get pods --all-namespaces

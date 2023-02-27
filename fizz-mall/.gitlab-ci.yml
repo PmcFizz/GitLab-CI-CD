@@ -1,0 +1,17 @@
+stages:
+  - install
+  - test
+  - build
+  - package
+  - deploy
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2"
+
+default:
+  tags:
+    - docker-runner
+
+include:
+  - local: fizz-service/.gitlab-ci-service.yml
+  - local: fizz-ui/.gitlab-ci-ui.yml

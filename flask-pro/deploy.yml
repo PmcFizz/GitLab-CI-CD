@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-pro-deploy
+  namespace: ci-test
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: flask-pro-app
+    spec:
+      containers:
+        - name: flask-pro-contain
+          imagePullPolicy: Always
+          image: FLASK_APP_IMAGE
+          env:
+          - name: TZ
+            value: Asia/Shanghai
+  selector:
+    matchLabels:
+      app: flask-pro-app
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-pro-server
+  namespace: ci-test
+spec:
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+      nodePort: 31594
+  selector:
+    app: flask-pro-app

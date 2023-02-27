@@ -1,0 +1,38 @@
+.ui-job-config:
+  image: node:14.17.0-alpine
+  before_script:
+    - cd fizz-ui
+  cache:
+    key:
+      files:
+        - fizz-ui/yarn.lock
+      prefix: ui
+    paths:
+      - fizz-ui/node_modules
+
+ui-install:
+  stage: install
+  extends: [.ui-job-config]
+  script:
+    - yarn
+
+ui-test:
+  stage: test
+  extends: [.ui-job-config]
+  script:
+    - yarn test
+  cache:
+    policy: pull
+
+
+ui-build:
+  stage: build
+  extends: [.ui-job-config]
+  script:
+    # - sleep 6000
+    - yarn build
+  artifacts:
+    paths:
+      - fizz-ui/build
+  cache:
+    policy: pull

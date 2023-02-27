@@ -1,0 +1,80 @@
+stages:
+  - install
+  - test
+  - build
+  - deploy
+
+default:
+  cache:
+    - key: $CI_COMMIT_BRANCH
+    - paths:
+      - node_modules
+  # 使用默认的docker-runner
+  tags:
+    - docker-runner
+  # 镜像默认使用node:12.21.0
+  image: node:12.21.0
+
+npm_install_job:
+  stage: install
+  script: yarn
+
+lint_code_style:
+  stage: test
+  script: yarn lint
+
+job_coverage:
+  stage: test
+  tags:
+    - docker-runner
+  script: echo 'coverage'
+  coverage: '/Code coverage: \d+\.\d+/'
+
+build_job:
+  stage: build
+  script: yarn build
+  artifacts:
+    paths:
+      - dist/
+
+# Docker部署到本地
+build_docker_job:
+  stage: deploy
+  variables:
+    IMAGE_NAME: "deployimg"
+    APP_CONTAINER_NAME: "myapp"
+  image: docker
+  script:
+    - docker build -t $IMAGE_NAME .
+    - if [ $(docker ps -aq --filter name=$APP_CONTAINER_NAME) ]; then docker rm -f $APP_CONTAINER_NAME;fi
+    - docker run -d -p 8083:80 --name $APP_CONTAINER_NAME $IMAGE_NAME
+    # - docker login -u $HARBOR_USERNAME -p $HARBOR_PWD $HARBOR_SERVER
+    # - docker push $IMAGE_NAME
+
+# 部署到阿里云OSS
+deploy_test_alioss:
+  stage: deploy
+  script:
+    - wget --no-check-certificate https://gosspublic.alicdn.com/ossutil/1.6.18/ossutil64
+    - chmod 755 ossutil64
+    - ls -l
+    - ./ossutil64 config -e ${OSSEndPoint} -i ${OSSAccessKeyID} -k ${OSSAccessKeySecret} -L CH --loglevel debug -c ~/.ossutilconfig
+    - ./ossutil64 -c ~/.ossutilconfig cp -r -f dist oss://topfe/
+    - echo 'deploy alioss success'
+
+# 部署到远程服务器
+deploy_server_job:
+  stage: deploy
+  variables:
+    SERVER_IP: "120.77.178.9"
+  image: ubuntu
+  before_script:
+    - 'command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )'
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan ${SERVER_IP} >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - scp -r public root@${SERVER_IP}:/usr/local/www
